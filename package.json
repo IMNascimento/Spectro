@@ -1,0 +1,29 @@
+{
+  "name": "spectro",
+  "version": "1.0.0",
+  "description": "lib para geração de espectrogramas",
+  "keywords": [
+    "spectogram",
+    "ts",
+    "spectogram",
+    "spectogram",
+    "js"
+  ],
+  "homepage": "https://github.com/IMNascimento/Spectro#readme",
+  "bugs": {
+    "url": "https://github.com/IMNascimento/Spectro/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IMNascimento/Spectro.git"
+  },
+  "license": "MIT",
+  "author": "Igor Nascimento",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
