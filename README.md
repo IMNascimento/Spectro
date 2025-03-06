@@ -1,4 +1,4 @@
-# [Nome do Projeto]
+# Spectro
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
@@ -69,9 +69,9 @@ Para compilar o código TypeScript e gerar os arquivos JavaScript na pasta dist,
 ## Exemplos de Uso
 
 ### Em Angular
-1. Instale sua lib via npm (se você a publicar) ou use um caminho relativo se estiver trabalhando localmente.
+1. Instale sua lib via npm.
 ```bash
-npm install spectro
+npm i @sophialabs/spectro
 ```
 2. Importe a classe em um componente Angular:
 ```ts
