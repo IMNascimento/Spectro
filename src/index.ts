@@ -14,6 +14,8 @@ export interface SpectrogramParams {
     colormapName?: string;        // Nome do colormap (ex.: 'hot', 'jet', etc.)
     canvasHeight?: number;        // Altura final do canvas
     nTicks?: number;              // Quantidade de ticks no eixo de frequência
+    gainDb?: number;   // Deslocamento de dB (por exemplo, +20 dB)
+    rangeDb?: number;  // Intervalo de dB para normalização (por exemplo, 80 dB)
   }
   
   /**
@@ -29,6 +31,8 @@ export interface SpectrogramParams {
     colormapName: 'hot',
     canvasHeight: 400,
     nTicks: 6,
+    gainDb: 20,    
+    rangeDb: 80,  // faixa de 80 dB (exemplo)
   };
   
   /**
@@ -47,33 +51,38 @@ export interface SpectrogramParams {
      * Retorna um HTMLCanvasElement contendo o espectrograma desenhado.
      */
     public generateSpectrogram(audioData: Float32Array): HTMLCanvasElement {
-      const { sampleRate, scaleType, fMin, fMax, fftSize, windowType, colormapName, canvasHeight } = this.params;
-  
+      const { sampleRate, scaleType, fMin, fMax, fftSize, windowType, colormapName } = this.params;
+    
       const spectrogramData = this.computeSpectrogram(audioData, fftSize, windowType);
-  
+    
       const nyquist = sampleRate / 2;
       const binFreq = nyquist / (fftSize / 2);
       const i_min = Math.floor(fMin / binFreq);
       const i_max = Math.floor(fMax / binFreq);
-  
+
       const { offscreenCanvas, specWidth, specHeight, globalMax } =
         this.createOffscreenCanvas(spectrogramData, i_min, i_max, colormapName);
-  
-      const finalCanvas = document.createElement('canvas');
-      const ctx = finalCanvas.getContext('2d')!;
-      const scaleFactor = canvasHeight / specHeight;
-      const finalWidth = specWidth * scaleFactor;
-      const finalHeight = specHeight * scaleFactor;
-  
+    
       const leftMargin = 60;
       const rightMargin = 10;
+      const availableWidth = window.innerWidth;
+      const finalWidth = availableWidth - (leftMargin + rightMargin);
+      const scaleFactor = finalWidth / specWidth;
+      const finalHeight = specHeight * scaleFactor;
+    
+      const finalCanvas = document.createElement('canvas');
       finalCanvas.width = leftMargin + finalWidth + rightMargin;
       finalCanvas.height = finalHeight;
-  
-      ctx.drawImage(offscreenCanvas, 0, 0, specWidth, specHeight, leftMargin, 0, finalWidth, finalHeight);
-  
+      const ctx = finalCanvas.getContext('2d')!;
+      
+      ctx.drawImage(
+        offscreenCanvas,
+        0, 0, specWidth, specHeight, 
+        leftMargin, 0, finalWidth, finalHeight 
+      );
+    
       this.drawFrequencyAxis(ctx, scaleType, fMin, fMax, finalHeight, scaleFactor, i_min, i_max, leftMargin);
-  
+    
       return finalCanvas;
     }
   
@@ -82,7 +91,7 @@ export interface SpectrogramParams {
      * Retorna um array 2D: spectrogramData[frameIndex][binIndex].
      */
     private computeSpectrogram(audioData: Float32Array, fftSize: number, windowType: string): number[][] {
-      const hopSize = fftSize / 2; // 50% overlap
+      const hopSize = fftSize / 2;
       const numFrames = Math.floor((audioData.length - fftSize) / hopSize) + 1;
       const spectrogramData: number[][] = [];
   
@@ -91,6 +100,7 @@ export interface SpectrogramParams {
         const frame = audioData.slice(start, start + fftSize);
         const windowedFrame = this.applyWindow(frame, windowType);
         const fftResult = this.myFFT(windowedFrame);
+  
         const magArray: number[] = [];
         for (let j = 0; j < fftResult.length / 2; j++) {
           const re = fftResult[j].re;
@@ -115,7 +125,9 @@ export interface SpectrogramParams {
       colormapName: string
     ) {
       const specWidth = spectrogramData.length;
-      const specHeight = Math.max(1, i_max - i_min); // evita zero ou negativo
+      const specHeight = Math.max(1, i_max - i_min);
+  
+
       let globalMax = -Infinity;
       for (let x = 0; x < spectrogramData.length; x++) {
         for (let y = i_min; y < i_max; y++) {
@@ -125,7 +137,7 @@ export interface SpectrogramParams {
         }
       }
       if (globalMax === -Infinity) {
-        globalMax = -100; // fallback
+        globalMax = -100; 
       }
   
       const offscreenCanvas = document.createElement('canvas');
@@ -134,17 +146,27 @@ export interface SpectrogramParams {
       const offscreenCtx = offscreenCanvas.getContext('2d')!;
       const imageData = offscreenCtx.createImageData(specWidth, specHeight);
   
+      const { gainDb, rangeDb } = this.params;
+  
       for (let x = 0; x < specWidth; x++) {
         for (let row = 0; row < specHeight; row++) {
           const binIndex = i_min + (specHeight - row - 1);
-          const valueDB = spectrogramData[x][binIndex] ?? -100;
-          let val = valueDB / globalMax;
+          let valueDB = spectrogramData[x][binIndex] ?? -100;
+
+          valueDB += gainDb;
+
+          let val = valueDB / rangeDb;
+  
+
           val = Math.max(0, Math.min(val, 1));
   
           let colorArray = this.getColormapValue(val, colormapName);
-          // fallback se não for válido
           if (!Array.isArray(colorArray) || colorArray.length < 3) {
-            colorArray = [Math.floor(255 * Math.min(1, val * 2)), val > 0.5 ? 255 : 0, 0];
+            colorArray = [
+              Math.floor(255 * Math.min(1, val * 2)),
+              val > 0.5 ? 255 : 0,
+              0,
+            ];
           }
           const [r, g, b] = colorArray;
   
@@ -179,7 +201,7 @@ export interface SpectrogramParams {
       ctx.textAlign = 'right';
   
       const freqTicks = this.generateDynamicFreqTicks(fMin, fMax, scaleType, this.params.nTicks);
-
+  
       const melMin = this.freqToMel(fMin);
       const melMax = this.freqToMel(fMax);
   
@@ -195,7 +217,9 @@ export interface SpectrogramParams {
           ratio = (freq - fMin) / (fMax - fMin);
         }
         const y = finalHeight - ratio * (i_max - i_min) * scaleFactor;
-        const label = freq >= 1000 ? (freq / 1000).toFixed(2) + ' kHz' : freq.toFixed(0) + ' Hz';
+        const label = freq >= 1000
+          ? (freq / 1000).toFixed(2) + ' kHz'
+          : freq.toFixed(0) + ' Hz';
   
         ctx.fillText(label, leftMargin - 5, y);
         ctx.beginPath();
@@ -232,6 +256,7 @@ export interface SpectrogramParams {
       const fftEven = this.myFFT(even);
       const fftOdd = this.myFFT(odd);
       const combined: Array<{ re: number; im: number }> = new Array(N);
+  
       for (let k = 0; k < half; k++) {
         const angle = (-2 * Math.PI * k) / N;
         const cos = Math.cos(angle);
@@ -251,7 +276,16 @@ export interface SpectrogramParams {
     private applyWindow(signal: Float32Array, windowType: string): Float32Array {
       const N = signal.length;
       const out = new Float32Array(N);
-      const BH7 = [0.2710514, -0.4332979392, 0.2181229995, -0.06592544639, 0.0108117421, -0.0007765848252, 0.00001388721735];
+      // Coeficientes da Blackman-Harris 7
+      const BH7 = [
+        0.2710514,
+        -0.4332979392,
+        0.2181229995,
+        -0.06592544639,
+        0.0108117421,
+        -0.0007765848252,
+        0.00001388721735
+      ];
   
       switch (windowType) {
         case 'None':
@@ -318,8 +352,6 @@ export interface SpectrogramParams {
         const result = fn(value);
         return Array.isArray(result) ? result : [0, 0, 0];
       }
-      // fallback
       return [255 * value, 0, 0];
     }
   }
-  

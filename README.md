@@ -2,11 +2,13 @@
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.0.7-blue)
 
 ## Introdução
 
 **Spectro** é uma biblioteca escrita em TypeScript que gera espectrogramas a partir de dados de áudio (Float32Array). Ela utiliza a Transformada Rápida de Fourier (FFT) com diferentes funções janela e suporta mapeamento de cores (colormaps) com um conjunto de colormaps inspirados no Matplotlib.
+
+<img src="./spectograma.png" alt="Imagem do spectogram">
 
 ## Recursos
 

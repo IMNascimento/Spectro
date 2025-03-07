@@ -1,12 +1,10 @@
 {
   "name": "@sophialabs/spectro",
-  "version": "1.0.3",
+  "version": "1.2.7",
   "description": "lib para geração de espectrogramas",
   "keywords": [
     "spectogram",
     "ts",
-    "spectogram",
-    "spectogram",
     "js",
     "sophialabs",
     "sophiamind"
@@ -21,11 +19,27 @@
   },
   "license": "MIT",
   "author": "Igor Nascimento",
-  "type": "commonjs",
-  "main": "index.js",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.es.js",
+  "types": "dist/index.d.ts",
+  "source": "src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.es.js",
+      "require": "./dist/index.cjs.js"
+    }
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "microbundle",
+    "prepublishOnly": "npm run build",
     "watch": "tsc --watch",
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "microbundle": "^0.15.1"
   }
 }
