@@ -363,5 +363,9 @@ Distribuído sob a licença MIT. Veja LICENSE para mais informações.
 Igor Nascimento - Desenvolvedor Principal - [IMNascimento](https://github.com/IMNascimento/)
 
 ## Agradecimentos
-[Recursos ou bibliotecas que você usou]
-[Qualquer outra pessoa ou organização que você queira mencionar]
+Gostaríamos de expressar nossa sincera gratidão à empresa [SophiaLabs](https://github.com/SophiaLab) pelo apoio inestimável no desenvolvimento de códigos open source. Sua dedicação incansável em fortalecer nossa comunidade e impulsionar o universo open source é uma fonte de constante inspiração.
+
+Agradecemos, também, a Deus, cuja graça e orientação têm sido fundamentais em cada passo desta jornada, possibilitando conquistas e o contínuo aprimoramento de nossos projetos.
+
+Muito obrigado a todos que, de alguma forma, colaboram para tornar esse trabalho possível.
+
