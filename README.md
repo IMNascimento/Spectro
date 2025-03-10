@@ -2,7 +2,7 @@
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.0.7-blue)
+![Version](https://img.shields.io/badge/version-1.3.8-blue)
 
 ## Introdução
 
@@ -19,6 +19,8 @@
   - Seleção de escala (Linear ou Mel)
   - Escolha de colormap
   - Altura final do canvas e quantidade de ticks no eixo de frequência
+  - Geração de png do espectrograma de alta resolução
+  - Ocultar o eixo de frequência Hz
 - Colormaps exportados e tipados (ex.: `hot`, `jet`, etc.)
 
 
@@ -102,15 +104,21 @@ export class AppComponent {
         
         // Defina os parâmetros conforme necessário
         const params: SpectrogramParams = {
+          sampleRate: 44100,
           scaleType: 'Mel',
           fMin: 1,
           fMax: 20000,
           fftSize: 8192,
           windowType: 'BH7',
           colormapName: 'hot',
-          canvasHeight: 400,
-          nTicks: 6
+          canvasHeight: 500,
+          nTicks: 20,
+          gainDb: 20,
+          rangeDb: 80,
+          targetWidth: 0,     // 0 indica que usaremos window.innerWidth
+          showFrequencyAxis: false
         };
+
 
         const generator = new SpectrogramGenerator(params);
         const canvas = generator.generateSpectrogram(audioData);
@@ -133,14 +141,19 @@ Basta importar a lib normalmente, seja via npm ou via um caminho relativo. Por e
 import { SpectrogramGenerator } from 'spectro';
 
 const params = {
+  sampleRate: 44100,
   scaleType: 'Mel',
   fMin: 1,
   fMax: 20000,
   fftSize: 8192,
   windowType: 'BH7',
   colormapName: 'hot',
-  canvasHeight: 400,
-  nTicks: 6
+  canvasHeight: 500,
+  nTicks: 20,
+  gainDb: 20,
+  rangeDb: 80,
+  targetWidth: 0,     // 0 indica que usaremos window.innerWidth
+  showFrequencyAxis: false
 };
 
 const generator = new SpectrogramGenerator(params);
@@ -186,17 +199,16 @@ http-server .
       max-width: 100%;
     }
     #spectroContainer {
-        max-width: 100%;
-        overflow-x: auto; /* Adiciona barra de rolagem horizontal se necessário */
+      max-width: 100%;
+      overflow-x: auto;
     }
-
   </style>
 </head>
 <body>
   <h1>Teste da Lib Spectro</h1>
   <div id="controls">
     <label for="audioFile">Carregar arquivo de áudio:</label>
-    <input type="file" id="audioFile" accept="audio/*" />
+    <input type="file" id="audioFile" accept="audio/*">
     <br><br>
     <label for="scale">Escala:</label>
     <select id="scale">
@@ -221,7 +233,7 @@ http-server .
     </select>
     <br><br>
     <label for="customFmax">Frequência Máxima Personalizada (Hz):</label>
-    <input type="number" id="customFmax" min="1" placeholder="Ex: 15000" />
+    <input type="number" id="customFmax" min="1" placeholder="Ex: 15000">
     <small>(Se preenchido, sobrescreve o select acima)</small>
     <br><br>
     <label for="fftSize">Tamanho do Buffer (FFT):</label>
@@ -247,25 +259,24 @@ http-server .
       <option value="terrain">terrain</option>
       <option value="RdPu">RdPu</option>
       <option value="binary">binary</option>
-      <!-- Adicione outros se necessário -->
     </select>
     <br><br>
     <label for="canvasHeight">Altura do espectrograma (px):</label>
-    <input type="number" id="canvasHeight" value="400" min="100" step="50" />
+    <input type="number" id="canvasHeight" value="400" min="100" step="50">
     <br><br>
     <button id="generateBtn">Gerar Espectrograma</button>
   </div>
 
   <div id="spectroContainer"></div>
 
-  <!-- Importa os colormaps e a lib compilada -->
+  <!-- Importa a lib compilada (index.js já reexporta os colormaps) -->
   <script type="module">
-    // Importa a classe da sua lib compilada (disponível em dist/)
-    import { SpectrogramGenerator } from './dist/index.js';
-    import { partial } from './dist/colormaps.js';
-    window.partial = partial;
+    import { SpectrogramGenerator, partial } from './dist/index.es.js'; // ou index.cjs.js
 
-    // Exponha os colormaps globalmente, se necessário:
+    // Exponha a função partial globalmente se necessário
+    window.partial = partial;
+    
+    // Se desejar expor alguns colormaps para uso global:
     window.hot = partial('hot');
     window.jet = partial('jet');
     window.viridis = partial('viridis');
@@ -287,7 +298,6 @@ http-server .
       const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
       const audioData = audioBuffer.getChannelData(0);
 
-      // Obtenha os parâmetros dos controles (sem type assertions, usando getElementById)
       const scaleElement = document.getElementById('scale');
       const fminElement = document.getElementById('f_min');
       const fmaxElement = document.getElementById('f_max');
@@ -308,17 +318,23 @@ http-server .
         windowType: windowElement ? windowElement.value : 'BH7',
         colormapName: colormapElement ? colormapElement.value : 'hot',
         canvasHeight: canvasHeightElement ? parseInt(canvasHeightElement.value) : 400,
-        nTicks: 6
+        showFrequencyAxis: false,
       };
 
-      // Cria a instância da sua lib e gera o espectrograma
       const generator = new SpectrogramGenerator(params);
       const spectroCanvas = generator.generateSpectrogram(audioData);
-
-      // Exibe o canvas na página
       const container = document.getElementById('spectroContainer');
       container.innerHTML = '';
       container.appendChild(spectroCanvas);
+      /*
+      const pngDataUrl = generator.exportHighResPNG(audioData, 3);
+      console.log(pngDataUrl);
+      const link = document.createElement('a');
+        link.href = pngDataUrl;
+        link.download = 'spectrogram.png';
+        link.textContent = 'Baixar PNG de alta resolução';
+        document.body.appendChild(link);
+        */
     });
   </script>
 </body>
