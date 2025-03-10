@@ -84,7 +84,7 @@ npm i @sophialabs/spectro
 ```ts
 // Exemplo: app.component.ts
 import { Component } from '@angular/core';
-import { SpectrogramGenerator, SpectrogramParams } from 'spectro';
+import { SpectrogramGenerator, SpectrogramParams, partial } from '@sophialabs/spectro';
 
 @Component({
   selector: 'app-root',
@@ -104,6 +104,12 @@ export class AppComponent {
         const audioCtx = new AudioContext();
         const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
         const audioData = audioBuffer.getChannelData(0);
+
+        (window as any).partial = partial;
+        (window as any).hot = partial('hot');
+        (window as any).jet = partial('jet');
+        (window as any).viridis = partial('viridis');
+        (window as any).Greens = partial('Greens');
         
         // Defina os parâmetros conforme necessário
         const params: SpectrogramParams = {
@@ -141,7 +147,7 @@ Certifique-se de que os arquivos compilados (por exemplo, os arquivos de sua lib
 ### Em Outros Projetos TypeScript/JavaScript
 Basta importar a lib normalmente, seja via npm ou via um caminho relativo. Por exemplo, em um projeto Node.js ou um script ES:
 ```ts
-import { SpectrogramGenerator } from 'spectro';
+import { SpectrogramGenerator, SpectrogramParams, partial } from '@sophialabs/spectro';
 
 const params = {
   sampleRate: 44100,
@@ -329,7 +335,7 @@ http-server .
       const container = document.getElementById('spectroContainer');
       container.innerHTML = '';
       container.appendChild(spectroCanvas);
-      /*
+
       const pngDataUrl = generator.exportHighResPNG(audioData, 3);
       console.log(pngDataUrl);
       const link = document.createElement('a');
@@ -337,7 +343,7 @@ http-server .
         link.download = 'spectrogram.png';
         link.textContent = 'Baixar PNG de alta resolução';
         document.body.appendChild(link);
-        */
+
     });
   </script>
 </body>
