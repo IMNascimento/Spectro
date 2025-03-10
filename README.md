@@ -10,6 +10,8 @@
 
 <img src="./spectograma.png" alt="Imagem do spectogram">
 
+<img src="./spectograma_jet.png" alt="Imagem do spectogram jet color">
+
 ## Recursos
 
 - Geração de espectrogramas a partir de um array de áudio (single channel)
@@ -21,6 +23,7 @@
   - Altura final do canvas e quantidade de ticks no eixo de frequência
   - Geração de png do espectrograma de alta resolução
   - Ocultar o eixo de frequência Hz
+  - Passar ganho inicial e faixa de ganho Db.
 - Colormaps exportados e tipados (ex.: `hot`, `jet`, etc.)
 
 
