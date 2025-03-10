@@ -1,4 +1,6 @@
-# Spectro
+<h1>
+  <img src="./sophialab.png" alt="Imagem da logo SophiaLabs" width="40" style="vertical-align: middle;"> Spectro
+</h1>
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
@@ -21,7 +23,7 @@
   - Seleção de escala (Linear ou Mel)
   - Escolha de colormap
   - Altura final do canvas e quantidade de ticks no eixo de frequência
-  - Geração de png do espectrograma de alta resolução
+  - Geração de **.png** do espectrograma de alta resolução
   - Ocultar o eixo de frequência Hz
   - Passar ganho inicial e faixa de ganho Db.
 - Colormaps exportados e tipados (ex.: `hot`, `jet`, etc.)
