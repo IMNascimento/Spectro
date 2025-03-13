@@ -4,7 +4,7 @@
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.3.8-blue)
+![Version](https://img.shields.io/badge/version-1.4.8-blue)
 
 ## Introdução
 
@@ -26,6 +26,7 @@
   - Geração de **.png** do espectrograma de alta resolução
   - Ocultar o eixo de frequência Hz
   - Passar ganho inicial e faixa de ganho Db.
+  - Passagens de filtro **Passa alta**, **Passa Baixo**, **Passa Banda**, **Rejeita banda**
 - Colormaps exportados e tipados (ex.: `hot`, `jet`, etc.)
 
 

@@ -19,6 +19,8 @@ export interface SpectrogramParams {
   rangeDb?: number;             // Intervalo de dB para normalização (exemplo: 80 dB)
   targetWidth?: number;         // Largura final desejada (se 0 ou não definida, usa window.innerWidth)
   showFrequencyAxis?: boolean;  // Se true, exibe o eixo de frequência (default: false)
+  filterType?: 'none' | 'lowpass' | 'highpass' | 'bandpass' | 'notch';
+  filterCutoffs?: number[]; // Para lowpass/highpass use [cutoff]; para bandpass/notch, use [lowCut, highCut]
 }
 
 /**
@@ -37,7 +39,9 @@ const DEFAULT_PARAMS: Required<SpectrogramParams> = {
   gainDb: 20,
   rangeDb: 80,
   targetWidth: 0,     // 0 indica que usaremos window.innerWidth
-  showFrequencyAxis: false
+  showFrequencyAxis: false,
+  filterType: 'none',
+  filterCutoffs: [],
 };
 
 /**
@@ -111,13 +115,14 @@ export class SpectrogramGenerator {
 
 
   private computeSpectrogram(audioData: Float32Array, fftSize: number, windowType: string): number[][] {
+    const filteredData = this.applyFilter(audioData);
     const hopSize = fftSize / 2;
-    const numFrames = Math.floor((audioData.length - fftSize) / hopSize) + 1;
+    const numFrames = Math.floor((filteredData.length - fftSize) / hopSize) + 1;
     const spectrogramData: number[][] = [];
-
+  
     for (let i = 0; i < numFrames; i++) {
       const start = i * hopSize;
-      const frame = audioData.slice(start, start + fftSize);
+      const frame = filteredData.slice(start, start + fftSize);
       const windowedFrame = this.applyWindow(frame, windowType);
       const fftResult = this.myFFT(windowedFrame);
       const magArray: number[] = [];
@@ -360,6 +365,52 @@ export class SpectrogramGenerator {
       return Array.isArray(result) ? result : [0, 0, 0];
     }
     return [255 * value, 0, 0];
+  }
+
+  private applyFilter(signal: Float32Array): Float32Array {
+    const { filterType, filterCutoffs, sampleRate } = this.params;
+    if (!filterType || filterType === 'none') {
+      return signal;
+    }
+  
+    // Exemplo para um filtro FIR passa baixa:
+    if (filterType === 'lowpass' && filterCutoffs && filterCutoffs.length >= 1) {
+      const cutoff = filterCutoffs[0];
+      const kernelSize = 101; // tamanho do kernel (deve ser ímpar)
+      const kernel = new Float32Array(kernelSize);
+      const fc = cutoff / sampleRate; // frequência normalizada
+  
+      const mid = Math.floor(kernelSize / 2);
+      for (let i = 0; i < kernelSize; i++) {
+        if (i === mid) {
+          kernel[i] = 2 * fc;
+        } else {
+          const n = i - mid;
+          kernel[i] = Math.sin(2 * Math.PI * fc * n) / (Math.PI * n);
+        }
+        // Aplica uma janela de Hamming, por exemplo:
+        kernel[i] *= 0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (kernelSize - 1));
+      }
+  
+      // Convolução simples (pode ser otimizada com FFT)
+      const output = new Float32Array(signal.length);
+      for (let i = 0; i < signal.length; i++) {
+        let sum = 0;
+        for (let j = 0; j < kernelSize; j++) {
+          const k = i - mid + j;
+          if (k >= 0 && k < signal.length) {
+            sum += signal[k] * kernel[j];
+          }
+        }
+        output[i] = sum;
+      }
+      return output;
+    }
+  
+    // Para outros tipos (highpass, bandpass, notch), implemente lógica similar.
+    // Você pode também aplicar filtragem no domínio da frequência.
+  
+    return signal; // fallback, se nenhum filtro for aplicado
   }
 }
 
