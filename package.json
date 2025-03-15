@@ -1,13 +1,16 @@
 {
   "name": "@sophialabs/spectro",
-  "version": "1.4.8",
+  "version": "1.5.8",
   "description": "lib para geração de espectrogramas",
   "keywords": [
     "spectogram",
     "ts",
     "js",
     "sophialabs",
-    "sophiamind"
+    "sophiamind",
+    "audio",
+    "filters",
+    "frequency"
   ],
   "homepage": "https://github.com/IMNascimento/Spectro#readme",
   "bugs": {
