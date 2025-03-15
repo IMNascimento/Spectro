@@ -21,6 +21,8 @@ export interface SpectrogramParams {
   showFrequencyAxis?: boolean;  // Se true, exibe o eixo de frequência (default: false)
   filterType?: 'none' | 'lowpass' | 'highpass' | 'bandpass' | 'notch';
   filterCutoffs?: number[]; // Para lowpass/highpass use [cutoff]; para bandpass/notch, use [lowCut, highCut]
+  enablePitchDetection?: boolean; // Habilita extração de pitch (não implementado)
+  enableHarmonicsExtraction?: boolean; // Habilita extração de harmônicos (não implementado)
 }
 
 /**
@@ -28,20 +30,22 @@ export interface SpectrogramParams {
  */
 const DEFAULT_PARAMS: Required<SpectrogramParams> = {
   sampleRate: 44100,
-  scaleType: 'Mel',
+  scaleType: 'Linear',
   fMin: 1,
-  fMax: 20000,
-  fftSize: 8192,
+  fMax: 30000,
+  fftSize: 2048,
   windowType: 'BH7',
   colormapName: 'hot',
   canvasHeight: 500,  
-  nTicks: 20,         
-  gainDb: 20,
-  rangeDb: 80,
+  nTicks: 0,         
+  gainDb: 0,
+  rangeDb: 0,
   targetWidth: 0,     // 0 indica que usaremos window.innerWidth
   showFrequencyAxis: false,
   filterType: 'none',
   filterCutoffs: [],
+  enablePitchDetection: false,
+  enableHarmonicsExtraction: false,
 };
 
 /**
@@ -367,50 +371,174 @@ export class SpectrogramGenerator {
     return [255 * value, 0, 0];
   }
 
-  private applyFilter(signal: Float32Array): Float32Array {
-    const { filterType, filterCutoffs, sampleRate } = this.params;
-    if (!filterType || filterType === 'none') {
-      return signal;
-    }
-  
-    // Exemplo para um filtro FIR passa baixa:
-    if (filterType === 'lowpass' && filterCutoffs && filterCutoffs.length >= 1) {
-      const cutoff = filterCutoffs[0];
-      const kernelSize = 101; // tamanho do kernel (deve ser ímpar)
-      const kernel = new Float32Array(kernelSize);
-      const fc = cutoff / sampleRate; // frequência normalizada
-  
-      const mid = Math.floor(kernelSize / 2);
-      for (let i = 0; i < kernelSize; i++) {
-        if (i === mid) {
-          kernel[i] = 2 * fc;
-        } else {
-          const n = i - mid;
-          kernel[i] = Math.sin(2 * Math.PI * fc * n) / (Math.PI * n);
-        }
-        // Aplica uma janela de Hamming, por exemplo:
-        kernel[i] *= 0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (kernelSize - 1));
+  /**
+   * Método para detecção da frequência fundamental (pitch tracking).
+   * Utiliza um algoritmo simples de autocorrelação para encontrar o lag com
+   * maior correlação e, assim, estimar a frequência fundamental.
+   * Retorna a frequência fundamental em Hz.
+   */
+  public detectPitch(audioData: Float32Array): number {
+    const sampleRate = this.params.sampleRate;
+    // Define limites de lag com base nas frequências mínima e máxima
+    const minLag = Math.floor(sampleRate / this.params.fMax);
+    const maxLag = Math.floor(sampleRate / this.params.fMin);
+    let bestLag = 0;
+    let bestCorrelation = -Infinity;
+
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      let sum = 0;
+      for (let i = 0; i < audioData.length - lag; i++) {
+        sum += audioData[i] * audioData[i + lag];
       }
-  
-      // Convolução simples (pode ser otimizada com FFT)
-      const output = new Float32Array(signal.length);
-      for (let i = 0; i < signal.length; i++) {
-        let sum = 0;
-        for (let j = 0; j < kernelSize; j++) {
-          const k = i - mid + j;
-          if (k >= 0 && k < signal.length) {
-            sum += signal[k] * kernel[j];
-          }
-        }
-        output[i] = sum;
+      if (sum > bestCorrelation) {
+        bestCorrelation = sum;
+        bestLag = lag;
       }
-      return output;
     }
-  
-    // Para outros tipos (highpass, bandpass, notch), implemente lógica similar.
-    // Você pode também aplicar filtragem no domínio da frequência.
-  
-    return signal; // fallback, se nenhum filtro for aplicado
+    // Evita divisão por zero
+    if (bestLag === 0) return 0;
+    return sampleRate / bestLag;
+  }
+
+  /**
+   * Método para extração de harmônicos.
+   * Primeiro, detecta a frequência fundamental e, em seguida, calcula os harmônicos
+   * como múltiplos inteiros da frequência fundamental, respeitando o limite máximo fMax.
+   * Retorna um objeto contendo a frequência fundamental e um array com os harmônicos.
+   */
+  public extractHarmonics(audioData: Float32Array): { fundamental: number; harmonics: number[] } {
+    const fundamental = this.detectPitch(audioData);
+    const harmonics: number[] = [];
+    // Extrai harmônicos a partir do segundo (n=2) até um máximo de 10 ou até ultrapassar fMax
+    for (let n = 2; n <= 10; n++) {
+      const harmonicFreq = fundamental * n;
+      if (harmonicFreq > this.params.fMax) break;
+      harmonics.push(harmonicFreq);
+    }
+    return { fundamental, harmonics };
+  }
+
+
+/**
+ * Aplica filtragem FIR no sinal de entrada de acordo com os parâmetros definidos.
+ * Suporta os filtros: lowpass, highpass, bandpass e notch.
+ */
+private applyFilter(signal: Float32Array): Float32Array {
+  const { filterType, filterCutoffs, sampleRate } = this.params;
+  if (!filterType || filterType === 'none') {
+    return signal;
+  }
+
+  // Definindo o tamanho do kernel (deve ser ímpar para manter simetria)
+  const kernelSize = 101;
+  let kernel: Float32Array;
+
+  if (filterType === 'lowpass' && filterCutoffs && filterCutoffs.length >= 1) {
+    kernel = this.generateLowpassKernel(filterCutoffs[0], sampleRate, kernelSize);
+  } else if (filterType === 'highpass' && filterCutoffs && filterCutoffs.length >= 1) {
+    kernel = this.generateHighpassKernel(filterCutoffs[0], sampleRate, kernelSize);
+  } else if ((filterType === 'bandpass' || filterType === 'notch') && filterCutoffs && filterCutoffs.length >= 2) {
+    const lowCut = filterCutoffs[0];
+    const highCut = filterCutoffs[1];
+    if (filterType === 'bandpass') {
+      kernel = this.generateBandpassKernel(lowCut, highCut, sampleRate, kernelSize);
+    } else {
+      kernel = this.generateNotchKernel(lowCut, highCut, sampleRate, kernelSize);
+    }
+  } else {
+    // Se os parâmetros forem insuficientes, retorne o sinal sem filtragem
+    return signal;
+  }
+
+  // Convolução simples do sinal com o kernel
+  const output = new Float32Array(signal.length);
+  const mid = Math.floor(kernelSize / 2);
+  for (let i = 0; i < signal.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < kernelSize; j++) {
+      const k = i - mid + j;
+      if (k >= 0 && k < signal.length) {
+        sum += signal[k] * kernel[j];
+      }
+    }
+    output[i] = sum;
+  }
+  return output;
+}
+
+  /**
+   * Gera um kernel FIR para um filtro passa-baixa (lowpass) usando o método windowed-sinc.
+   * @param cutoff Frequência de corte (Hz).
+   * @param sampleRate Taxa de amostragem (Hz).
+   * @param kernelSize Tamanho do kernel (deve ser ímpar).
+   */
+  private generateLowpassKernel(cutoff: number, sampleRate: number, kernelSize: number): Float32Array {
+    const kernel = new Float32Array(kernelSize);
+    const fc = cutoff / sampleRate; // Frequência normalizada
+    const mid = Math.floor(kernelSize / 2);
+    for (let i = 0; i < kernelSize; i++) {
+      const n = i - mid;
+      // Função sinc: sin(2πfc n)/(πn); trata n = 0 separadamente.
+      kernel[i] = n === 0 ? 2 * fc : Math.sin(2 * Math.PI * fc * n) / (Math.PI * n);
+      // Aplica janela de Hamming
+      kernel[i] *= 0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (kernelSize - 1));
+    }
+    return kernel;
+  }
+
+  /**
+   * Gera um kernel FIR para um filtro passa-alta (highpass).
+   * A ideia é subtrair o kernel lowpass de um delta (impulso unitário).
+   * @param cutoff Frequência de corte (Hz).
+   * @param sampleRate Taxa de amostragem (Hz).
+   * @param kernelSize Tamanho do kernel (deve ser ímpar).
+   */
+  private generateHighpassKernel(cutoff: number, sampleRate: number, kernelSize: number): Float32Array {
+    const lowpassKernel = this.generateLowpassKernel(cutoff, sampleRate, kernelSize);
+    const kernel = new Float32Array(kernelSize);
+    const mid = Math.floor(kernelSize / 2);
+    for (let i = 0; i < kernelSize; i++) {
+      // Delta: 1 no centro, 0 caso contrário
+      kernel[i] = (i === mid ? 1 : 0) - lowpassKernel[i];
+    }
+    return kernel;
+  }
+
+  /**
+   * Gera um kernel FIR para um filtro passa-banda (bandpass).
+   * O filtro passa-banda é obtido pela diferença entre dois filtros passa-baixa,
+   * com frequências de corte superior e inferior.
+   * @param lowCut Frequência de corte inferior (Hz).
+   * @param highCut Frequência de corte superior (Hz).
+   * @param sampleRate Taxa de amostragem (Hz).
+   * @param kernelSize Tamanho do kernel (deve ser ímpar).
+   */
+  private generateBandpassKernel(lowCut: number, highCut: number, sampleRate: number, kernelSize: number): Float32Array {
+    const lowpassHigh = this.generateLowpassKernel(highCut, sampleRate, kernelSize);
+    const lowpassLow = this.generateLowpassKernel(lowCut, sampleRate, kernelSize);
+    const kernel = new Float32Array(kernelSize);
+    for (let i = 0; i < kernelSize; i++) {
+      kernel[i] = lowpassHigh[i] - lowpassLow[i];
+    }
+    return kernel;
+  }
+
+  /**
+   * Gera um kernel FIR para um filtro notch (bandstop).
+   * O filtro notch é obtido subtraindo o filtro passa-banda de um delta (impulso unitário).
+   * @param lowCut Frequência de corte inferior (Hz) da banda a ser rejeitada.
+   * @param highCut Frequência de corte superior (Hz) da banda a ser rejeitada.
+   * @param sampleRate Taxa de amostragem (Hz).
+   * @param kernelSize Tamanho do kernel (deve ser ímpar).
+   */
+  private generateNotchKernel(lowCut: number, highCut: number, sampleRate: number, kernelSize: number): Float32Array {
+    const bandpassKernel = this.generateBandpassKernel(lowCut, highCut, sampleRate, kernelSize);
+    const kernel = new Float32Array(kernelSize);
+    const mid = Math.floor(kernelSize / 2);
+    for (let i = 0; i < kernelSize; i++) {
+      kernel[i] = (i === mid ? 1 : 0) - bandpassKernel[i];
+    }
+    return kernel;
   }
 }
 
